@@ -1,0 +1,88 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Variable.Global.bClosed.Declare(Boolean,False)
+Variable.Global.sJob.Declare(String)
+Variable.Global.sSuffix.Declare(String)
+Variable.Global.sSeq.Declare(String)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+'Coded by SFF 6/3/15
+'call sub to check flag, if flag comes back as true then sequence is closed so display message and pass override to NOT allow user to clock in
+F.Intrinsic.Control.If(V.Caller.Hook,=,15934,"OR",V.Caller.Hook,=,15951)
+	F.Intrinsic.Control.SelectCase(V.Caller.Hook)
+		F.Intrinsic.Control.Case(15934)
+			V.Global.sJob.Set(V.Passed.009000.Trim)
+			V.Global.sSuffix.Set(V.Passed.009001.Trim)
+			V.Global.sSeq.Set(V.Passed.009002.Trim)
+		F.Intrinsic.Control.Case(15951)
+			V.Global.sJob.Set(V.Passed.009990.Trim)
+			V.Global.sSuffix.Set(V.Passed.009991.Trim)
+			V.Global.sSeq.Set(V.Passed.009992.Trim)
+	F.Intrinsic.Control.EndSelect
+	'call sub that will set boolean to TRUE if FLAG_CLOSED = 'Y' for the passed JOB-SUFFIX and SEQUENCE
+	F.Intrinsic.Control.CallSub(Checkseq)
+	F.Intrinsic.Control.if(V.Global.bClosed,=,True)
+		F.Intrinsic.UI.MsgBox("Sequence Closed, Please See Manager","Sequence Closed")
+		'Pass Override so User cannot Clock in
+		V.Passed.777777.Set(1)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+'End Program
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3957_BLK_CLSD_SEQ_GUI.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Main.End
+
+Program.Sub.CheckSeq.Start
+F.Intrinsic.Control.SetErrorHandler("CheckSeq_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+'Get Flag from Job Operations if Flag Closed = Y then set Boolean to True
+V.Local.sSql.Declare(String)
+F.Intrinsic.String.Build("Select FLAG_CLOSED from v_JOB_OPERATIONS where JOB = '{0}' and SUFFIX = '{1}' and SEQ = '{2}'",V.Global.sJob,V.Global.sSuffix,V.Global.sSeq,V.Local.sSql)
+F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass,72000)
+F.ODBC.Connection!conx.OpenRecordsetRO("rst",V.Local.sSql)
+F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,<>,True)
+	F.Intrinsic.Control.If(V.ODBC.conx!rst.FieldValTrim!FLAG_CLOSED,=,"Y")
+		V.Global.bClosed.Set(True)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+F.ODBC.conx!rst.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("CheckSeq_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_3957_BLK_CLSD_SEQ_GUI.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.CheckSeq.End
+
+Program.Sub.Comments.Start
+${$0$}$GCG_BLK_CLSD_SEQ_GUI$}$SUPERVSR$}$6/3/2015
+${$3$}$0$}$$}$-1$}$-1$}$$}$1/1/1900$}$Program is attached to 15951 and 15934 and prevents user from clocking into closed sequences.
+
+If sequence is closed, msgbox will appear that says "Sequence Closed, Please See Manager"
+
+Override is set so user cannot clock in.
+Program.Sub.Comments.End
+
